@@ -1,0 +1,42 @@
+# Makefile for the convolution SIMD project (single source file).
+#
+# Everything is single-threaded now, so there's no -fopenmp anymore.
+#
+# Why these flags:
+#   -O3               one optimization level for the WHOLE file, so the scalar
+#                     baseline (my speedup denominator) is built exactly like
+#                     the kernels it's compared against. No mixed -O2/-O3.
+#   -march=x86-64-v3  pins the ISA to exactly AVX2 + FMA. I use this instead of
+#                     -march=native so the build is reproducible across x86
+#                     boxes and can't sneak in AVX-512 on a fancier machine.
+#   -Wall -Wextra     catch the silly stuff.
+#
+# ?= means "use this unless the caller overrides it", so I can still do e.g.
+#   make CXXFLAGS="-std=c++17 -O3 -march=native -ffast-math"
+# to try a different build without editing this file.
+
+CXX      ?= g++
+CXXFLAGS ?= -std=c++17 -O3 -march=x86-64-v3 -Wall -Wextra
+
+TARGET := convolution
+SRC    := convolution.cpp
+
+# Default target: just build the binary.
+all: $(TARGET)
+
+$(TARGET): $(SRC)
+	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET)
+
+# Build (if needed) and run the benchmark.
+run: $(TARGET)
+	./$(TARGET)
+
+# Show which loops the compiler actually vectorized. This turns my
+# "Rung 2 auto-vectorizes" claim into evidence instead of an assertion.
+vec-report: $(SRC)
+	$(CXX) $(CXXFLAGS) -fopt-info-vec-optimized -c $(SRC) -o /dev/null
+
+clean:
+	rm -f $(TARGET)
+
+.PHONY: all run vec-report clean
